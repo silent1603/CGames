@@ -1,3 +1,3 @@
 @echo off
 
-call Build/main.exe
+cmd /c Build\main.exe
