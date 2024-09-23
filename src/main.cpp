@@ -12,6 +12,21 @@ struct win32_offscreen_bufffer
     int Pitch;
     int BytesPerPixel;
 };
+struct win32_window_dimension
+{
+    int Width;
+    int Height;
+};
+
+win32_window_dimension Win32_GetWindowDimension(HWND window)
+{
+    struct win32_window_dimension result;
+    RECT clientRect;
+    GetClientRect(window,&clientRect);
+    result.Width = clientRect.right - clientRect.left;
+    result.Height = clientRect.bottom - clientRect.top;
+    return result;
+}
 
 global_variable bool g_running = false;
 global_variable win32_offscreen_bufffer g_backbuffer;
@@ -69,12 +84,9 @@ internal void Win32_ResizeDIBSection(win32_offscreen_bufffer* buffer,int width,i
     buffer->Pitch = buffer->BytesPerPixel * width;
 }
 
-internal void Win32_UpdateCopyBufferToWindow(HDC deviceContext,RECT windowRect,win32_offscreen_bufffer* buffer,int x , int y,int width,int height)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext,int windowWidth,int windowHeight,win32_offscreen_bufffer* buffer,int x , int y,int width,int height)
 {
-    int windowWidth = windowRect.right - windowRect.left;
-    int windowHeight = windowRect.bottom - windowRect.top;
-    StretchDIBits(deviceContext,0,0,buffer->Width,buffer->Height,
-                                0,0,windowWidth,windowHeight,
+    StretchDIBits(deviceContext, 0,0,windowWidth,windowHeight,0,0,buffer->Width,buffer->Height,
                                buffer->BitmapMemory,&buffer->BitmapInfo,DIB_RGB_COLORS,SRCCOPY);
 }
 
@@ -85,16 +97,12 @@ LRESULT CALLBACK MainWindowCallBack(HWND window, UINT message, WPARAM wParam, LP
     {
     case WM_CREATE:
     {
-        RECT clientRect;
-        GetClientRect(window,&clientRect);
-        int width = clientRect.right -clientRect.left;
-        int height =clientRect.bottom - clientRect.top;
-        Win32_ResizeDIBSection(&g_backbuffer,width,height);
         OutputDebugStringA("WM_CREATE\n");
     }
     break;
     case WM_SIZE:
     {
+
         OutputDebugStringA("WM_SIZE\n");
     }
     break;
@@ -122,9 +130,11 @@ LRESULT CALLBACK MainWindowCallBack(HWND window, UINT message, WPARAM wParam, LP
         int height = paint.rcPaint.bottom - paint.rcPaint.top;
         int width = paint.rcPaint.left - paint.rcPaint.right;
         RECT clientRect;
-        GetClientRect(window,&clientRect);
-        Win32_UpdateCopyBufferToWindow(deviceContext,clientRect,&g_backbuffer,x,y,width,height);
-        PatBlt(deviceContext,x,y,width,height,WHITENESS);
+
+        win32_window_dimension dimension = Win32_GetWindowDimension(window);
+        Win32_DisplayBufferInWindow(deviceContext,dimension.Width,dimension.Height,&g_backbuffer,x,y,width,height);
+        
+     
         EndPaint(window,&paint);
     }
     break;
@@ -142,6 +152,9 @@ LRESULT CALLBACK MainWindowCallBack(HWND window, UINT message, WPARAM wParam, LP
 int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PreInstance, LPSTR CommandLine, int ShowCode)
 {
     WNDCLASS windowClass = {};
+
+    Win32_ResizeDIBSection(&g_backbuffer,1280,720);
+
     windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
     windowClass.lpfnWndProc = MainWindowCallBack;
     windowClass.hInstance = Instance;
@@ -171,11 +184,8 @@ int CALLBACK WinMain(HINSTANCE Instance, HINSTANCE PreInstance, LPSTR CommandLin
                 {
                     DrawGradient(&g_backbuffer,xoffset,yOffset);
                     HDC deviceContext = GetDC(windowHandle);
-                    RECT clientRect;
-                    GetClientRect(windowHandle,&clientRect);
-                    int windowWidth = clientRect.right - clientRect.left;
-                    int windowHeight = clientRect.bottom - clientRect.top;
-                    Win32_UpdateCopyBufferToWindow(deviceContext,clientRect,&g_backbuffer,0,0,windowWidth,windowHeight);
+                    win32_window_dimension dimenstion = Win32_GetWindowDimension(windowHandle);
+                    Win32_DisplayBufferInWindow(deviceContext,dimenstion.Width,dimenstion.Height,&g_backbuffer,0,0,dimenstion.Width,dimenstion.Height);
                     ReleaseDC(windowHandle,deviceContext);
                 }
                 xoffset++;

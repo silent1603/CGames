@@ -1,2 +1,2 @@
 @echo off
-devenv .\Build\main.exe
+devenv .\Build\main.exe src/main.cpp
